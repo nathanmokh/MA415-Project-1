@@ -1,0 +1,193 @@
+---
+title: "Border Patrol Apprehensions: 2010 vs 2017"
+author: "Han Nguyen, Carlos Echeverri, Nathan Mokhtarzadeh"
+date: "February 19, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Since Donald Trump became President, apprehensions at the US-Mexico border have been very low compared to previous years. This is because people have stopped illegally crossing the Southern border, which may be due to the President's "rhetoric and aggressive push" to enforce immigration laws. "Would-be" immigrants may be waiting and watching instead of crossing the border.
+
+In this project, we compare the number of border patrol apprehensions in the years 2010 and 2017, as well as monthly summaries to see if there has been a significant decrease in apprehensions. We compare different months in each sector: Big Bend, Del Rio, El Centro, El Paso, Laredo, Rio Grande Valley, San Diego, Tucson, and Yuma. 
+
+
+#### Ahead we call in the two data tables, which now include totals for each sector and month.
+```{r}
+# read bp tables for each year
+A2010 <- read.csv("bp appre 2010.csv", header = TRUE, stringsAsFactors = FALSE)
+A2017 <- read.csv("bp appre 2017.csv", header = TRUE, stringsAsFactors = FALSE)
+
+
+# get name of each sector
+rownames(A2010) <- A2010[,1]
+A2010[,1]
+rownames(A2017) <- A2017[,1]
+
+
+# function to get totals of each sector, month, and data as a whole
+getTotals <- function(data) {
+  data <-  subset(data, select= -c(Sector))
+  rownames(data)
+  
+  data <- rbind(data, colSums(data))
+  
+  rownames(data)
+  
+  -length(rownames(data))  
+  
+  rownames(data) <- c(rownames(data)[-length(rownames(data))], "Total")
+  
+  data <- cbind(data,rowSums(data))
+  
+  colnames(data) <- c(colnames(data)[-length(colnames(data))], "Total")
+  return(data)
+  
+}
+
+# Append totals for data
+A2010 <- getTotals(A2010)
+A2017 <- getTotals(A2017)
+
+```
+
+# Visualization of the Data
+
+We compare the number of apprehensions in 2010 and 2017 by months and sector in a side by side barplot. Below are 9 barplots that represent each sector. 
+
+```{r}
+# a function to create side-by-side barplots comparing the 2010 and 2017 statistics by 
+# month and sector
+compare <- function(){
+  
+  for (x in 1:9) {
+    
+    title <- rownames(A2010)[x]
+    
+    both <- rbind(A2010[x,1:12], A2017[x,1:12])
+    
+    row.names(both) <- c("2010", "2017")
+    
+    barplot(as.matrix(both), beside = TRUE, col = c("red", "blue"), bty="n",xlab = 'Month',
+            ylab = 'Number of Apprehensions', cex.names = 0.5 )
+    
+    legend("topright", c("2010","2017"), pch=15,  col=c("red","blue"),  bty="n", 
+           title = title)
+    
+  }
+}
+compare()
+```
+In general, there seemed to be a much higher number of apprehensions in 2010 between the months of February and May, and a higher number of apprehensions in 2017 between September and December. Tucson and San Diego had the most change when looking at the barplots. There was a large decrease in number of apprehensions from 2010 to 2017. 
+
+\newpage
+# Statistical Testing
+
+#### Most Apprehensions by Sector
+We first compared the sector with the most apprehensions in 2010 and 2017. In 2010, Tucson had the most apprehensions, and in 2017, Rio Grande Valley had the most apprehensions. With this data, we took a t-test to see if there was a significant difference in these maximums. The null hypothesis is that the means between these apprehensions are equal to 0, and the alternative hypothesis is that they are not equal to 0.
+
+```{r}
+# T Test for most apprehensions by sector
+customTest <- function(earlyData, newData) {
+  #Assumes getTotals function has been run on data
+  #Data for old data input
+  maximumOld <- max(earlyData[1:9,13])
+  maxRowIndexOld <- which.max(earlyData[1:9,13])
+  earlyDataMean <- rowMeans(earlyData[maxRowIndexOld,1:12])
+
+  
+  #Data for new data input
+  maximumNew <- max(newData[1:9,13])
+  maxRowIndexNew <- which.max(newData[1:9,13])
+  newDataMean <- rowMeans(newData[maxRowIndexNew,1:12])
+
+  
+  t.test(earlyData[maxRowIndexOld,1:12], newData[maxRowIndexNew,1:12])
+  
+}
+customTest(A2010,A2017)
+```
+
+Although the mean of Tucson in 2010 was 17684 apprehensions, and the mean of Rio Grande Valley in 2017 was 11464, there seems that there would be a difference in the mean. Surprisingly, the t-test gave a t-score of 2, and a p-value of 0.06. Using an alpha of 0.05, we fail to reject the null hypothesis since the p-value is greater than alpha. This p-value is still low, but not low enough. This means that the difference in the means of apprehensions in 2010 and 2017 are not significantly different. This is also seen in the confidence interval, which is (-380, 12820), and includes 0, meaning there is not a significant difference. 
+
+
+\newpage
+#### Most Apprehensions in 3 Month Period
+Then, we compared the 3 month periods with the most apprehensions in 2010 and 2017. In 2010, March, April, and May had the most apprehensions, and in 2017, October, November, and December had the most apprehensions. Again, with this data, we took a t-test to see if there was a significant difference in these maximums.
+```{r}
+#Get top three months
+topMonths <- function(data){
+  copy <- data
+  copy <- sort(copy[10,1:12], decreasing = TRUE)[1:3]
+  copy
+}
+
+# T test for top three months in apprehensions
+compareThreeMonthPeriod <- function(earlyData, newData) {
+  earlyDataThree <- topMonths(earlyData)
+  newDataThree <- topMonths(newData)
+  # get indices of these months
+  earlyColName1 <- grep(colnames(earlyDataThree[1]), colnames(earlyData))
+  earlyColName2 <- grep(colnames(earlyDataThree[2]), colnames(earlyData))
+  earlyColName3 <- grep(colnames(earlyDataThree[3]), colnames(earlyData))
+  earlyIndex <- min(earlyColName1,earlyColName2,earlyColName3)
+  
+  newColName1 <- grep(colnames(newDataThree[1]), colnames(newData))
+  newColName2 <- grep(colnames(newDataThree[2]), colnames(newData))
+  newColName3 <- grep(colnames(newDataThree[3]), colnames(newData))
+  newIndex <- min(newColName1,newColName2,newColName3)
+
+  
+  earlyMean <- mean(c(earlyData[1:9,earlyIndex],earlyData[1:9,earlyIndex+1],
+                      earlyData[1:9,earlyIndex+2]))
+  newMean <- mean(c(newData[1:9,newIndex],newData[1:9,newIndex+1],newData[1:9,newIndex+2]))
+  
+  
+  
+  t.test(c(earlyData[1:9,earlyIndex],earlyData[1:9,earlyIndex+1],
+           earlyData[1:9,earlyIndex+2]),c(newData[1:9,newIndex],newData[1:9,newIndex+1],
+                                          newData[1:9,newIndex+2]))
+  
+  
+}
+
+compareThreeMonthPeriod(A2010,A2017)
+
+```
+
+Although the mean for 2010 was 6061, and the mean for 2017 was 5061, which is a decrease in apprehensions, the t-test said that this difference was insignificant. The t score was 0.5 and the p-value was 0.6, which is way above the alpha of 0.05. Since the p-value was above alpha, we fail to reject the null hypothesis, so the true difference in means is equal to 0, which means there is no significant difference in the means comparing most apprehensions in 3 month periods. The confidence interval says the same since it is (-3120,5120), which includes 0, meaning the differences in means are insignificant.
+
+
+#### Most Apprehensions Overall
+Because we believed there still may be a significant difference, we took a t-test of each data as a whole in 2010 and 2017, to see if there may be a difference there. The total number of apprehensions in 2010 was 447731, and in 2017 was 303916. This looks like a huge difference, since it nearly decreased by 15000.
+
+```{r}
+# T test for whole data
+t.test(A2010, A2017)
+```
+
+Surprisingly, although there seemed to be a big change, there was not a significant difference in the means of apprehensions. The t test gave a t score of 0.9 and the p-value was 0.3, which is above the alpha of 0.05, meaning we fail to reject the null hypothesis. So, there is no true difference between the means in 2010 and 2017. The confidence interval says the same, being (-4857,13707), which includes 0, saying that there is no true difference between the means. 
+
+\newpage
+# Time Series Chart
+```{r}
+# time series chart for monthly summaries
+ts <- readClipboard(raw = FALSE)
+
+ts1 <- read.table("clipboard", sep = "\t")
+ts1
+
+ts2 <- rev(as.vector(t(ts1)))
+
+ts3 <- ts(ts2, start = c(2000,10), frequency=12)
+
+ts.plot(ts3, gpars=list(xlab="year", ylab="Apprehensions", lty=c(1:3)), col = 'blue')
+```
+
+The time series chart shows a decrease in apprehensions throughout the years from 2000 to 2017. There seems to be a large decrease, although our statistical tests say otherwise for 2010 and 2017.
+
+
+# Overall
+In conclusion, there seems to be a decrease in apprehensions throughout the years, probably due to the fact that less "would-be" immigrants are crossing the border since the president has been changing immigration laws. The t-tests, though, don't show a significant difference between mean of apprehensions in 2010 and 2017. But the flaw in this may be that we are only comparing the maximum number of apprehensions by sectors or months in each year, disregarding what month and sector they are actually in. If there was a comparison between each sector and each month, there may be a bigger significant difference. 
